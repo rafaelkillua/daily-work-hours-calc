@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>Cálculo de horas do dia</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://unpkg.com/dayjs/dayjs.min.js"></script>
+    <script src="https://unpkg.com/dayjs/plugin/duration.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <table>
+        <thead>
+          <tr>
+            <td>Entrada</td>
+            <td>Almoço</td>
+            <td>Volta</td>
+            <td>Saída</td>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <input type="time" v-model="enter" autofocus />
+            </td>
+            <td>
+              <input type="time" v-model="lunch" />
+            </td>
+            <td>
+              <input type="time" v-model="back" />
+            </td>
+            <td>
+              <input type="time" v-model="exit" />
+            </td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>Total: {{total}}</td>
+            <td colspan="2">Trabalhado: {{worked || '-'}}</td>
+            <td :style="{ color: balance.includes('-') ? 'red' : 'green' }">
+              Saldo: {{balance}}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <script>
+      const WORK_HOURS = 8;
+      const TIME_FORMAT = "HH:mm";
+
+      new Vue({
+        el: "#app",
+        data: {
+          enter: "",
+          lunch: "",
+          back: "",
+          exit: "",
+        },
+        computed: {
+          total: function () {
+            return this.formatTime(dayjs().hour(WORK_HOURS).minute(0));
+          },
+          worked: function () {
+            const enterDate = this.getDateFromInput(this.enter);
+            let lunchDate = this.getDateFromInput(this.lunch);
+            const backDate = this.getDateFromInput(this.back);
+            let exitDate = this.getDateFromInput(this.exit);
+
+            if (backDate && enterDate && lunchDate && exitDate) {
+              if (lunchDate.isBefore(enterDate)) lunchDate = lunchDate.add(1, 'd')
+              const firstShift = this.getDurationBetweenDates(
+                enterDate,
+                lunchDate
+              );
+
+              if (exitDate.isBefore(backDate)) exitDate = exitDate.add(1, 'd')
+              const lastShift = this.getDurationBetweenDates(
+                backDate,
+                exitDate
+              );
+
+              return this.formatTime(firstShift.add(lastShift));
+            } else {
+              return NaN;
+            }
+          },
+          balance: function () {
+            const workedDate = this.getDateFromInput(this.worked);
+            const totalDate = this.getDateFromInput(this.total);
+
+            if (workedDate && totalDate) {
+              return this.formatTime(
+                this.getDurationBetweenDates(totalDate, workedDate)
+              );
+            } else {
+              return "-";
+            }
+          },
+        },
+        methods: {
+          isInputValid() {
+            return (input) => /\d{2}:\d{2}/.test(input);
+          },
+          getDateFromInput(input) {
+            if (input) {
+              const [hour, minute] = input.split(":");
+              return dayjs().hour(hour).minute(minute);
+            } else {
+              return NaN;
+            }
+          },
+          getDurationBetweenDates(date1, date2) {
+            return dayjs.duration(date2.diff(date1));
+          },
+          formatTime(date) {
+            return date.format(TIME_FORMAT);
+          },
+        },
+        mounted() {
+          dayjs.extend(dayjs_plugin_duration);
+        },
+        watch: {
+          enter: function (enter) {
+            if (this.isInputValid(enter)) {
+              const enterDate = this.getDateFromInput(enter);
+
+              if (enterDate) {
+                this.lunch = this.formatTime(enterDate.add(4, "h"));
+              }
+            }
+          },
+          lunch: function (lunch) {
+            if (this.isInputValid(lunch)) {
+              const lunchDate = this.getDateFromInput(lunch);
+
+              if (lunchDate) {
+                this.back = this.formatTime(lunchDate.add(1, "h"));
+              }
+            }
+          },
+          back: function (back) {
+            if (this.isInputValid(back)) {
+              const backDate = this.getDateFromInput(back);
+              const enterDate = this.getDateFromInput(this.enter);
+              const lunchDate = this.getDateFromInput(this.lunch);
+
+              if (backDate && enterDate && lunchDate) {
+                const workDuration = dayjs.duration(WORK_HOURS, "h");
+                const workedTime = this.getDurationBetweenDates(
+                  enterDate,
+                  lunchDate
+                );
+                const remainingTime = workDuration.subtract(workedTime);
+
+                this.exit = this.formatTime(backDate.add(remainingTime));
+              }
+            }
+          },
+        },
+      });
+    </script>
+    <style>
+      table {
+        min-width: 600px;
+        border-collapse: collapse;
+      }
+
+      table td {
+        width: 25%;
+        padding: 0.5rem 1rem;
+        text-align: center;
+      }
+
+      table td,
+      table th {
+        border: 1px solid black;
+      }
+
+      table thead {
+        font-weight: bold;
+      }
+
+      table tfoot {
+        font-size: 1rem;
+      }
+
+      input {
+        width: 100%;
+      }
+    </style>
+  </body>
+</html>
